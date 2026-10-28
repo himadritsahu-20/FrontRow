@@ -1,36 +1,45 @@
-export type Importance = 'Critical' | 'High' | 'Medium' | 'Low';
+export type Priority = "Critical" | "High" | "Medium" | "Low";
+
+export type TaskType =
+  | "Problem Set"
+  | "Lab Report"
+  | "Exam Prep"
+  | "Essay"
+  | "Quiz"
+  | "Reading"
+  | "Discussion Post"
+  | "Project"
+  | "Homework";
+
+export type DueStatus = "overdue" | "today" | "tomorrow" | "upcoming" | "done";
 
 export interface Task {
   id: string;
   title: string;
   subject: string;
-  type: string;
-  hours: number;
-  dueDate: string; // YYYY-MM-DD, local calendar date
-  importance: Importance;
+  type: TaskType;
+  due: string; // YYYY-MM-DD, local calendar date
+  hours: number; // estimated hours
+  priority: Priority;
+  score: number; // 0-100
   notes?: string;
   completed: boolean;
-  completedAt?: string; // YYYY-MM-DD, local calendar date
-  createdAt: string;
+  completedAt?: string; // ISO timestamp when completed
+  createdAt: string; // ISO timestamp
 }
 
-export interface Profile {
-  name: string;
+export interface StudentProfile {
+  fullName: string;
   roll: string;
   branch: string;
 }
 
-export const IMPORTANCE_LEVELS: Importance[] = ['Critical', 'High', 'Medium', 'Low'];
-
-export const TASK_TYPES = [
-  'Problem Set',
-  'Lab Report',
-  'Essay',
-  'Exam Prep',
-  'Reading',
-  'Project',
-  'Quiz',
-  'Discussion',
-  'Presentation',
-  'Other',
-];
+export interface TaskDraft {
+  title: string;
+  subject: string;
+  type: TaskType;
+  due: string;
+  hours: string;
+  priority: Priority;
+  notes?: string;
+}

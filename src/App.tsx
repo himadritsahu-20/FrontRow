@@ -1,31 +1,40 @@
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
-import { StoreProvider, useStore } from './lib/store';
-import Header from './components/Header';
-import TaskModal from './components/TaskModal';
-import SignIn from './pages/SignIn';
-import Home from './pages/Home';
-import Tasks from './pages/Tasks';
-import CalendarPage from './pages/CalendarPage';
-import Analytics from './pages/Analytics';
+import { AppProvider, useApp } from "./lib/store";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Header } from "./components/Header";
+import TaskModal from "./components/TaskModal";
+import SignIn from "./pages/SignIn";
+import Home from "./pages/Home";
+import Tasks from "./pages/Tasks";
+import Calendar from "./pages/Calendar";
+import Analytics from "./pages/Analytics";
 
-function SignInGate() {
-  const { profile } = useStore();
-  if (profile) return <Navigate to="/" replace />;
-  return <SignIn />;
-}
+function AppShell() {
+  const { profile, hydrated } = useApp();
+  const location = useLocation();
 
-function ProtectedLayout() {
-  const { profile } = useStore();
-  if (!profile) return <Navigate to="/signin" replace />;
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f6f3ec]">
+        <p className="font-serif-display text-xl font-bold text-[#152142]">FrontRow</p>
+      </div>
+    );
+  }
+
+  // Auth gate: all app pages require a profile.
+  if (!profile) {
+    return <SignIn />;
+  }
+
   return (
-    <div className="flex min-h-screen flex-col bg-linen">
+    <div className="min-h-screen bg-[#f6f3ec]">
       <Header />
-      <main className="flex-1">
-        <Outlet />
-      </main>
-      <footer className="border-t border-line py-5 text-center text-xs text-mist-soft">
-        FrontRow — Academic Priorities · all data stays in this browser
-      </footer>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/tasks" element={<Tasks />} />
+        <Route path="/calendar" element={<Calendar />} />
+        <Route path="/analytics" element={<Analytics />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
       <TaskModal />
     </div>
   );
@@ -33,19 +42,10 @@ function ProtectedLayout() {
 
 export default function App() {
   return (
-    <StoreProvider>
+    <AppProvider>
       <BrowserRouter>
-        <Routes>
-          <Route path="/signin" element={<SignInGate />} />
-          <Route element={<ProtectedLayout />}>
-            <Route path="/" element={<Home />} />
-            <Route path="/tasks" element={<Tasks />} />
-            <Route path="/calendar" element={<CalendarPage />} />
-            <Route path="/analytics" element={<Analytics />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <AppShell />
       </BrowserRouter>
-    </StoreProvider>
+    </AppProvider>
   );
 }

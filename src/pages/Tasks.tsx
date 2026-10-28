@@ -1,306 +1,256 @@
-import { useMemo, useState } from 'react';
-import { Check, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
-import { useStore } from '../lib/store';
-import { computeScore, sortByScoreDesc } from '../lib/score';
-import { diffDays, fmtHours, formatShort, dueInfo } from '../lib/date';
-import { SubjectBadge } from '../components/SubjectBadge';
-import { DueChip } from '../components/DueChip';
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { IMPORTANCE_LEVELS } from '../lib/types';
-import type { Task } from '../lib/types';
+import { useMemo, useState } from "react";
+import { useApp } from "../lib/store";
+import type { Task } from "../lib/types";
+import { dueLabel, dueStatusOf, diffDays, formatDate } from "../lib/dates";
+import { subjectStyle, ALL_SUBJECTS } from "../lib/subjects";
+import { PRIORITY_STYLE } from "../components/Header";
+import { Search, Pencil, Trash2, CheckCircle2, Circle, ChevronDown } from "lucide-react";
 
-type Tab = 'all' | 'critical' | 'upcoming' | 'done';
+type FilterTab = "all" | "critical" | "upcoming" | "done";
 
 export default function Tasks() {
-  const { tasks, today, toggleComplete, deleteTask, openEditTask, openNewTask } = useStore();
-  const [tab, setTab] = useState<Tab>('all');
-  const [query, setQuery] = useState('');
-  const [subjectFilter, setSubjectFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
-  const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
+  const { tasks, today, toggleComplete, deleteTask, openTask, openNewTask } = useApp();
+  const [tab, setTab] = useState<FilterTab>("all");
+  const [query, setQuery] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
 
   const open = tasks.filter((t) => !t.completed);
   const done = tasks.filter((t) => t.completed);
   const openHours = open.reduce((s, t) => s + t.hours, 0);
+  const critical = open.filter((t) => t.priority === "Critical").length;
+  const upcoming = open.filter((t) => dueStatusOf(t.due, false, today) === "upcoming").length;
 
-  const isCritical = (t: Task) => !t.completed && (t.importance === 'Critical' || diffDays(today, t.dueDate) < 0);
-  const isUpcoming = (t: Task) => !t.completed && diffDays(today, t.dueDate) >= 0;
+  const subjectsInUse = useMemo(() => {
+    const s = new Set(tasks.map((t) => t.subject));
+    return [...ALL_SUBJECTS.filter((x) => s.has(x)), ...[...s].filter((x) => !ALL_SUBJECTS.includes(x)).sort()];
+  }, [tasks]);
 
-  const tabCounts: Record<Tab, number> = {
+  const filtered = useMemo(() => {
+    let list = [...tasks];
+    if (tab === "critical") list = list.filter((t) => !t.completed && t.priority === "Critical");
+    else if (tab === "upcoming") list = list.filter((t) => !t.completed && dueStatusOf(t.due, false, today) === "upcoming");
+    else if (tab === "done") list = list.filter((t) => t.completed);
+    if (query.trim()) list = list.filter((t) => t.title.toLowerCase().includes(query.trim().toLowerCase()));
+    if (subjectFilter !== "all") list = list.filter((t) => t.subject === subjectFilter);
+    if (priorityFilter !== "all") list = list.filter((t) => t.priority === priorityFilter);
+    // Sort: open first (by score desc then due asc), then done (by completedAt desc).
+    list.sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      if (!a.completed && !b.completed) {
+        if (b.score !== a.score) return b.score - a.score;
+        return diffDays(today, a.due) - diffDays(today, b.due);
+      }
+      if (a.completed && b.completed) return (b.completedAt ?? "").localeCompare(a.completedAt ?? "");
+      return 0;
+    });
+    return list;
+  }, [tasks, tab, query, subjectFilter, priorityFilter, today]);
+
+  const counts = {
     all: tasks.length,
-    critical: tasks.filter(isCritical).length,
-    upcoming: tasks.filter(isUpcoming).length,
+    critical: critical,
+    upcoming: upcoming,
     done: done.length,
   };
 
-  const subjects = useMemo(() => [...new Set(tasks.map((t) => t.subject))].sort(), [tasks]);
-
-  const filtered = useMemo(() => {
-    let list = tasks;
-    if (tab === 'critical') list = list.filter(isCritical);
-    else if (tab === 'upcoming') list = list.filter(isUpcoming);
-    else if (tab === 'done') list = list.filter((t) => t.completed);
-
-    if (subjectFilter !== 'all') list = list.filter((t) => t.subject === subjectFilter);
-    if (priorityFilter !== 'all') list = list.filter((t) => t.importance === priorityFilter);
-    const q = query.trim().toLowerCase();
-    if (q) list = list.filter((t) => t.title.toLowerCase().includes(q));
-
-    const openSorted = sortByScoreDesc(list.filter((t) => !t.completed), today);
-    const doneSorted = [...list.filter((t) => t.completed)].sort((a, b) =>
-      (b.completedAt ?? '').localeCompare(a.completedAt ?? ''),
-    );
-    return [...openSorted, ...doneSorted];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, tab, subjectFilter, priorityFilter, query, today]);
-
-  const hasActiveFilters = query.trim() !== '' || subjectFilter !== 'all' || priorityFilter !== 'all';
-
-  const TABS: { id: Tab; label: string }[] = [
-    { id: 'all', label: 'All' },
-    { id: 'critical', label: 'Critical' },
-    { id: 'upcoming', label: 'Upcoming' },
-    { id: 'done', label: 'Done' },
+  const tabs: { id: FilterTab; label: string; count: number }[] = [
+    { id: "all", label: "All", count: counts.all },
+    { id: "critical", label: "Critical", count: counts.critical },
+    { id: "upcoming", label: "Upcoming", count: counts.upcoming },
+    { id: "done", label: "Done", count: counts.done },
   ];
 
-  const select =
-    'rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-ink focus:border-gold focus:ring-2 focus:ring-gold/40 focus:outline-none';
-
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <div className="fade-up flex flex-wrap items-end justify-between gap-4">
+    <div className="animate-fade-in mx-auto w-full max-w-[1400px] px-3 pb-14 pt-6 sm:px-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-semibold text-navy">Tasks</h1>
-          <p className="mt-1.5 text-sm text-mist">
-            <strong className="font-semibold text-ink">{open.length} open</strong> ·{' '}
-            <strong className="font-semibold text-ink">{done.length} completed</strong> ·{' '}
-            <strong className="font-semibold text-ink">{fmtHours(openHours)}</strong> of open workload
+          <h1 className="font-serif-display text-3xl font-bold tracking-tight text-[#152142]">Tasks</h1>
+          <p className="mt-1 text-[13.5px] text-[#5d759c]">
+            <span className="font-semibold text-[#152142]">{open.length}</span> open ·{" "}
+            <span className="font-semibold text-[#152142]">{done.length}</span> completed ·{" "}
+            <span className="font-semibold text-[#152142]">{openHours.toFixed(1)}h</span> open workload
           </p>
         </div>
         <button
           onClick={openNewTask}
-          className="flex items-center gap-1.5 rounded-lg bg-gold px-4 py-2.5 text-sm font-bold text-navy shadow-sm transition hover:bg-gold-deep hover:text-cream focus-visible:ring-2 focus-visible:ring-navy focus-visible:outline-none"
+          className="rounded-lg bg-[#d9a62e] px-4 py-2.5 text-[13.5px] font-bold text-[#152142] shadow transition hover:bg-[#c99a25] active:translate-y-px"
         >
-          <Plus size={15} strokeWidth={3} />
-          New task
+          + New task
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="fade-up mt-6 flex flex-wrap gap-1.5" style={{ animationDelay: '80ms' }} role="tablist" aria-label="Task filters">
-        {TABS.map(({ id, label }) => (
-          <button
-            key={id}
-            role="tab"
-            aria-selected={tab === id}
-            onClick={() => setTab(id)}
-            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none ${
-              tab === id ? 'bg-navy text-cream shadow-sm' : 'border border-line bg-white text-mist hover:text-navy'
-            }`}
-          >
-            {label}
-            <span className={`ml-1.5 text-xs ${tab === id ? 'text-gold' : 'text-mist-soft'}`}>{tabCounts[id]}</span>
-          </button>
-        ))}
-      </div>
+      {/* Filter bar */}
+      <div className="mt-5 flex flex-wrap items-center gap-2.5">
+        <div className="flex overflow-hidden rounded-xl border border-[#dde6f2] bg-white shadow-sm" role="tablist" aria-label="Task filters">
+          {tabs.map(({ id, label, count }) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium transition ${
+                tab === id ? "bg-[#152142] text-[#f6f3ec]" : "bg-white text-[#4a5568] hover:bg-[#f6f3ec]"
+              }`}
+            >
+              {label}
+              <span className={`rounded-full px-1.5 py-0.5 text-[10.5px] font-bold ${tab === id ? "bg-[#d9a62e] text-[#152142]" : "bg-[#eef1f6] text-[#5d759c]"}`}>
+                {count}
+              </span>
+            </button>
+          ))}
+        </div>
 
-      {/* Search + filters */}
-      <div className="fade-up mt-4 flex flex-col gap-3 sm:flex-row" style={{ animationDelay: '140ms' }}>
-        <div className="relative flex-1">
-          <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-mist-soft" />
+        <div className="relative min-w-[180px] flex-1 sm:max-w-xs">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8494ad]" />
           <input
+            type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by task title…"
+            placeholder="Search tasks…"
             aria-label="Search tasks"
-            className="w-full rounded-lg border border-line bg-white py-2 pr-3 pl-9 text-sm text-ink placeholder:text-mist-soft focus:border-gold focus:ring-2 focus:ring-gold/40 focus:outline-none"
+            className="w-full rounded-xl border border-[#dde6f2] bg-white py-2.5 pl-9 pr-3 text-[13.5px] text-[#152142] shadow-sm placeholder:text-[#8494ad] focus:border-[#d9a62e] focus:outline-none"
           />
         </div>
-        <div className="flex gap-3">
-          <select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)} aria-label="Filter by subject" className={`${select} flex-1 sm:flex-none`}>
-            <option value="all">All subjects</option>
-            {subjects.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-          <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} aria-label="Filter by priority" className={`${select} flex-1 sm:flex-none`}>
-            <option value="all">All priorities</option>
-            {IMPORTANCE_LEVELS.map((l) => (
-              <option key={l} value={l}>{l}</option>
-            ))}
-          </select>
-        </div>
+
+        <FilterSelect
+          value={subjectFilter}
+          onChange={setSubjectFilter}
+          options={[{ value: "all", label: "All subjects" }, ...subjectsInUse.map((s) => ({ value: s, label: s }))]}
+          label="Filter by subject"
+        />
+        <FilterSelect
+          value={priorityFilter}
+          onChange={setPriorityFilter}
+          options={[{ value: "all", label: "All priorities" }, { value: "Critical", label: "Critical" }, { value: "High", label: "High" }, { value: "Medium", label: "Medium" }, { value: "Low", label: "Low" }]}
+          label="Filter by priority"
+        />
       </div>
 
-      {/* List */}
-      <div className="fade-up mt-5 overflow-hidden rounded-2xl border border-line bg-cream shadow-sm" style={{ animationDelay: '200ms' }}>
-        {/* Desktop header row */}
-        <div className="hidden grid-cols-[minmax(0,2.4fr)_1.1fr_0.9fr_0.55fr_0.8fr_0.75fr_0.5fr_5.5rem] items-center gap-3 border-b border-line bg-white/70 px-4 py-2.5 text-[10px] font-bold tracking-wider text-mist-soft uppercase lg:grid">
-          <span>Task</span>
-          <span>Subject</span>
-          <span>Type</span>
-          <span>Est.</span>
-          <span>Due</span>
-          <span>Priority</span>
-          <span className="text-right">Score</span>
-          <span className="text-right">Actions</span>
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center px-6 py-14 text-center">
-            <Search size={26} className="text-mist-soft" />
-            <p className="font-display mt-3 text-lg font-semibold text-navy">
-              {tasks.length === 0 ? 'No tasks yet' : 'Nothing matches these filters'}
-            </p>
-            <p className="mt-1 max-w-sm text-sm text-mist">
-              {tasks.length === 0
-                ? 'Add your first task and FrontRow will slot it into the queue.'
-                : hasActiveFilters
-                  ? 'Try a different search term, or clear the subject and priority filters.'
-                  : `No tasks in the “${TABS.find((t) => t.id === tab)?.label}” view right now.`}
-            </p>
-            {hasActiveFilters && (
-              <button
-                onClick={() => {
-                  setQuery('');
-                  setSubjectFilter('all');
-                  setPriorityFilter('all');
-                }}
-                className="mt-4 rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-linen focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-        ) : (
-          <ul className="divide-y divide-line">
-            {filtered.map((t) => {
-              const score = computeScore(t, today);
-              const info = dueInfo(today, t.dueDate);
-              return (
-                <li key={t.id} className={`px-4 py-3 transition hover:bg-white/70 ${t.completed ? 'opacity-60' : ''}`}>
-                  {/* Desktop row */}
-                  <div className="hidden grid-cols-[minmax(0,2.4fr)_1.1fr_0.9fr_0.55fr_0.8fr_0.75fr_0.5fr_5.5rem] items-center gap-3 lg:grid">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <CompleteToggle task={t} onToggle={() => toggleComplete(t.id)} />
-                      <div className="min-w-0">
-                        <div className={`truncate text-sm font-semibold ${t.completed ? 'text-mist line-through' : 'text-ink'}`}>{t.title}</div>
-                        {t.notes && <div className="truncate text-xs text-mist-soft">{t.notes}</div>}
-                      </div>
-                    </div>
-                    <div><SubjectBadge subject={t.subject} /></div>
-                    <div className="truncate text-xs font-semibold text-mist">{t.type}</div>
-                    <div className="text-xs font-semibold text-mist">{fmtHours(t.hours)}</div>
-                    <div className="flex flex-col gap-0.5">
-                      <DueChip today={today} dueDate={t.dueDate} completed={t.completed} />
-                      <span className="pl-1 text-[10px] text-mist-soft">{formatShort(t.dueDate)}</span>
-                    </div>
-                    <div><ImportanceChip level={t.importance} /></div>
-                    <div className="text-right">
-                      <span className={`font-display text-lg font-semibold ${!t.completed && info.tone === 'overdue' ? 'text-danger' : 'text-navy'}`}>
-                        {score}
+      {/* Table */}
+      <div className="mt-4 overflow-hidden rounded-2xl border border-[#dde6f2] bg-white shadow-[0_1px_2px_rgba(21,33,66,0.05),0_4px_16px_rgba(21,33,66,0.06)]">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[820px] text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-[#eef1f6] bg-[#f8fafc] text-[11px] font-bold uppercase tracking-wider text-[#5d759c]">
+                <th className="px-4 py-3">Task</th>
+                <th className="px-3 py-3">Subject</th>
+                <th className="px-3 py-3">Type</th>
+                <th className="px-3 py-3 text-right">Hours</th>
+                <th className="px-3 py-3">Due</th>
+                <th className="px-3 py-3">Priority</th>
+                <th className="px-3 py-3 text-right">Score</th>
+                <th className="px-3 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#eef1f6]">
+              {filtered.map((t) => {
+                const st = subjectStyle(t.subject);
+                const status = dueStatusOf(t.due, t.completed, today);
+                return (
+                  <tr key={t.id} className={`transition hover:bg-[#fbf9f4] ${t.completed ? "opacity-60" : ""}`}>
+                    <td className="px-4 py-3">
+                      <button onClick={() => openTask(t.id)} className="text-left font-medium text-[#152142] hover:text-[#d9a62e] hover:underline focus:outline-none" title="Open task">
+                        {t.title}
+                      </button>
+                      {t.notes ? <p className="mt-0.5 max-w-[220px] truncate text-[11.5px] text-[#8494ad]">{t.notes}</p> : null}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-semibold" style={{ backgroundColor: st.bg, color: st.text, borderColor: st.border }}>
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.dot }} />
+                        {t.subject}
                       </span>
-                    </div>
-                    <RowActions task={t} onEdit={() => openEditTask(t.id)} onDelete={() => setPendingDelete(t)} onToggle={() => toggleComplete(t.id)} />
-                  </div>
-
-                  {/* Mobile card */}
-                  <div className="lg:hidden">
-                    <div className="flex items-start gap-3">
-                      <CompleteToggle task={t} onToggle={() => toggleComplete(t.id)} />
-                      <div className="min-w-0 flex-1">
-                        <div className={`text-sm font-semibold ${t.completed ? 'text-mist line-through' : 'text-ink'}`}>{t.title}</div>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                          <SubjectBadge subject={t.subject} />
-                          <span className="text-xs font-semibold text-mist">{t.type}</span>
-                          <span className="text-xs text-mist-soft">·</span>
-                          <span className="text-xs font-semibold text-mist">{fmtHours(t.hours)}</span>
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <DueChip today={today} dueDate={t.dueDate} completed={t.completed} />
-                          <ImportanceChip level={t.importance} />
-                          <span className="text-xs font-bold text-navy">Score {score}</span>
-                        </div>
+                    </td>
+                    <td className="px-3 py-3 text-[#4a5568]">{t.type}</td>
+                    <td className="px-3 py-3 text-right font-medium text-[#152142]">{t.hours}h</td>
+                    <td className="px-3 py-3">
+                      <span className={`inline-block rounded-md px-2 py-1 text-[11.5px] font-bold ${
+                        status === "overdue" ? "bg-[#f8e3e3] text-[#8f2d2d]"
+                        : status === "today" ? "bg-[#f0dcb0] text-[#7a5a10]"
+                        : status === "tomorrow" ? "bg-[#e9eef8] text-[#3a5a8a]"
+                        : status === "done" ? "bg-[#eef0f3] text-[#5a6675]"
+                        : "bg-[#f4f6f9] text-[#5d759c]"
+                      }`}>
+                        {dueLabel(t.due, t.completed, today)}
+                        <span className="ml-1 font-normal">· {formatDate(t.due)}</span>
+                      </span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className={`inline-block rounded-full border px-2.5 py-1 text-[11px] font-bold ${PRIORITY_STYLE[t.priority]}`}>
+                        {t.priority}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <span className="font-bold text-[#152142]">{t.score}</span>
+                      <span className="text-[11px] text-[#8494ad]">/100</span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => toggleComplete(t.id)}
+                          title={t.completed ? "Reopen task" : "Mark complete"}
+                          aria-label={t.completed ? "Reopen task" : "Mark complete"}
+                          className={`rounded-lg p-1.5 transition ${t.completed ? "text-[#2f9c84] hover:text-[#247a68]" : "text-[#8494ad] hover:text-[#2f9c84]"} hover:bg-[#eef4ef]`}
+                        >
+                          {t.completed ? <CheckCircle2 size={17} /> : <Circle size={17} />}
+                        </button>
+                        <button
+                          onClick={() => openTask(t.id)}
+                          title="Edit task"
+                          aria-label="Edit task"
+                          className="rounded-lg p-1.5 text-[#8494ad] transition hover:bg-[#f0dcb0] hover:text-[#7a5a10]"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() => deleteTask(t.id)}
+                          title="Delete task"
+                          aria-label="Delete task"
+                          className="rounded-lg p-1.5 text-[#8494ad] transition hover:bg-[#f8e3e3] hover:text-[#8f2d2d]"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
-                      <RowActions task={t} onEdit={() => openEditTask(t.id)} onDelete={() => setPendingDelete(t)} onToggle={() => toggleComplete(t.id)} compact />
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {filtered.length === 0 && (
+          <div className="px-6 py-14 text-center">
+            <p className="font-serif-display text-[17px] font-bold text-[#152142]">No tasks match your filters</p>
+            <p className="mt-1 text-[13px] text-[#8494ad]">Try a different search, or clear the filters.</p>
+            <button
+              onClick={() => { setQuery(""); setSubjectFilter("all"); setPriorityFilter("all"); setTab("all"); }}
+              className="mt-4 rounded-lg border border-[#dde6f2] bg-[#f6f3ec] px-4 py-2 text-[13px] font-semibold text-[#152142] hover:bg-[#efeadd]"
+            >
+              Clear filters
+            </button>
+          </div>
         )}
       </div>
-
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        title="Delete task?"
-        message={pendingDelete ? `“${pendingDelete.title}” will be removed permanently. This can't be undone.` : ''}
-        confirmLabel="Delete"
-        danger
-        onConfirm={() => {
-          if (pendingDelete) deleteTask(pendingDelete.id);
-          setPendingDelete(null);
-        }}
-        onCancel={() => setPendingDelete(null)}
-      />
     </div>
   );
 }
 
-function CompleteToggle({ task, onToggle }: { task: Task; onToggle: () => void }) {
-  return (
-    <button
-      onClick={onToggle}
-      aria-label={task.completed ? `Reopen “${task.title}”` : `Mark “${task.title}” complete`}
-      title={task.completed ? 'Reopen task' : 'Mark complete'}
-      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none ${
-        task.completed ? 'border-gold bg-gold text-navy' : 'border-mist-soft bg-white text-transparent hover:border-gold hover:text-gold'
-      }`}
-    >
-      <Check size={13} strokeWidth={3.5} />
-    </button>
-  );
-}
-
-function ImportanceChip({ level }: { level: Task['importance'] }) {
-  const styles: Record<string, string> = {
-    Critical: 'bg-danger-soft text-danger',
-    High: 'bg-gold-soft text-gold-deep',
-    Medium: 'bg-[#e5ecf5] text-mist',
-    Low: 'bg-[#eef1f6] text-mist-soft',
-  };
-  return <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap ${styles[level]}`}>{level}</span>;
-}
-
-function RowActions({
-  task,
-  onEdit,
-  onDelete,
-  onToggle,
-  compact,
-}: {
-  task: Task;
-  onEdit: () => void;
-  onDelete: () => void;
-  onToggle: () => void;
-  compact?: boolean;
+function FilterSelect({ value, onChange, options, label }: {
+  value: string; onChange: (v: string) => void;
+  options: { value: string; label: string }[]; label: string;
 }) {
-  const btn =
-    'rounded-lg p-1.5 text-mist transition hover:bg-linen hover:text-navy focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none';
   return (
-    <div className={`flex items-center justify-end gap-0.5 ${compact ? 'flex-col' : ''}`}>
-      {task.completed && (
-        <button onClick={onToggle} aria-label={`Reopen “${task.title}”`} title="Reopen" className={btn}>
-          <RotateCcw size={15} />
-        </button>
-      )}
-      <button onClick={onEdit} aria-label={`Edit “${task.title}”`} title="Edit" className={btn}>
-        <Pencil size={15} />
-      </button>
-      <button onClick={onDelete} aria-label={`Delete “${task.title}”`} title="Delete" className={`${btn} hover:text-danger`}>
-        <Trash2 size={15} />
-      </button>
+    <div className="relative">
+      <label htmlFor={label} className="sr-only">{label}</label>
+      <select
+        id={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="appearance-none rounded-xl border border-[#dde6f2] bg-white py-2.5 pl-3 pr-8 text-[13px] font-medium text-[#152142] shadow-sm focus:border-[#d9a62e] focus:outline-none"
+      >
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8494ad]" />
     </div>
   );
 }

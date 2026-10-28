@@ -1,174 +1,170 @@
-/* eslint-disable react-refresh/only-export-components */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
-import type { Task, Profile } from './types';
-import { buildDemoTasks } from './seed';
-import { todayISO } from './date';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { Task, StudentProfile, TaskDraft } from "./types";
+import { loadProfile, saveProfile, clearProfile, loadTasks, saveTasks, resetTasks } from "./storage";
+import { uid, scoreForPriority } from "./data";
+import { todayISO } from "./dates";
 
-// Profile and tasks are stored under separate keys on purpose:
-// signing out clears only the profile; resetting demo touches only tasks.
-const PROFILE_KEY = 'frontrow:profile';
-const TASKS_KEY = 'frontrow:tasks';
-
-function loadProfile(): Profile | null {
-  try {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    if (!raw) return null;
-    const p = JSON.parse(raw);
-    if (p && typeof p.name === 'string' && typeof p.roll === 'string' && typeof p.branch === 'string') return p;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function loadTasks(): Task[] | null {
-  try {
-    const raw = localStorage.getItem(TASKS_KEY);
-    if (!raw) return null;
-    const t = JSON.parse(raw);
-    return Array.isArray(t) ? (t as Task[]) : null;
-  } catch {
-    return null;
-  }
-}
-
-function makeId(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  return `t-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-export interface TaskInput {
-  title: string;
-  subject: string;
-  type: string;
-  hours: number;
-  dueDate: string;
-  importance: Task['importance'];
-  notes?: string;
-}
-
-interface ModalState {
-  mode: 'new' | 'edit';
-  taskId?: string;
-}
-
-interface StoreValue {
-  today: string;
-  profile: Profile | null;
+interface AppState {
+  profile: StudentProfile | null;
   tasks: Task[];
-  signIn: (p: Profile) => void;
+  hydrated: boolean;
+  today: string;
+
+  signIn: (p: StudentProfile) => void;
   signOut: () => void;
-  addTask: (input: TaskInput) => void;
-  updateTask: (id: string, input: TaskInput) => void;
-  deleteTask: (id: string) => void;
-  toggleComplete: (id: string) => void;
   resetDemo: () => void;
-  modal: ModalState | null;
+
+  addTask: (draft: TaskDraft) => Task;
+  updateTask: (id: string, draft: TaskDraft) => void;
+  toggleComplete: (id: string) => void;
+  deleteTask: (id: string) => void;
+
+  editingId: string | null;
+  openTask: (id: string) => void;
+  closeTaskModal: () => void;
+  newTaskOpen: boolean;
   openNewTask: () => void;
-  openEditTask: (id: string) => void;
-  closeModal: () => void;
+  closeNewTask: () => void;
 }
 
-const StoreContext = createContext<StoreValue | null>(null);
+const AppCtx = createContext<AppState | null>(null);
 
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<Profile | null>(() => loadProfile());
-  const [tasks, setTasks] = useState<Task[]>(() => loadTasks() ?? buildDemoTasks(todayISO()));
-  const [modal, setModal] = useState<ModalState | null>(null);
+export function AppProvider({ children }: { children: ReactNode }) {
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [hydrated, setHydrated] = useState(false);
   const [today, setToday] = useState<string>(() => todayISO());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [newTaskOpen, setNewTaskOpen] = useState(false);
 
-  // Keep "today" fresh if the tab stays open across midnight / regains focus.
+  const tasksRef = useRef<Task[]>(tasks);
+  tasksRef.current = tasks;
+  const saveTimer = useRef<number | null>(null);
+
   useEffect(() => {
-    const refresh = () => setToday(todayISO());
-    window.addEventListener('focus', refresh);
-    const iv = window.setInterval(refresh, 60_000);
-    return () => {
-      window.removeEventListener('focus', refresh);
-      window.clearInterval(iv);
+    setProfile(loadProfile());
+    setTasks(loadTasks());
+    setHydrated(true);
+  }, []);
+
+  // Keep "today" correct across midnight: reroll at the next midnight.
+  useEffect(() => {
+    let timer: number;
+    const schedule = () => {
+      const now = new Date();
+      const next = new Date(now);
+      next.setHours(24, 0, 5, 0);
+      timer = window.setTimeout(() => {
+        setToday(todayISO());
+        schedule();
+      }, next.getTime() - now.getTime());
     };
+    schedule();
+    return () => window.clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    try {
-      if (profile) localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-      else localStorage.removeItem(PROFILE_KEY);
-    } catch {
-      /* storage unavailable */
-    }
-  }, [profile]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
-    } catch {
-      /* storage unavailable */
-    }
-  }, [tasks]);
-
-  const signIn = useCallback((p: Profile) => setProfile(p), []);
-  // Sign-out clears ONLY the profile — task data is untouched.
-  const signOut = useCallback(() => setProfile(null), []);
-
-  const addTask = useCallback((input: TaskInput) => {
-    setTasks((prev) => [
-      { ...input, id: makeId(), completed: false, createdAt: todayISO() },
-      ...prev,
-    ]);
+  const persistTasks = useCallback((next: Task[]) => {
+    setTasks(next);
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => saveTasks(next), 60);
   }, []);
 
-  const updateTask = useCallback((id: string, input: TaskInput) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...input } : t)));
+  const signIn = useCallback((p: StudentProfile) => {
+    saveProfile(p);
+    setProfile(p);
   }, []);
 
-  const deleteTask = useCallback((id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+  const signOut = useCallback(() => {
+    clearProfile();
+    setProfile(null);
   }, []);
+
+  const resetDemo = useCallback(() => {
+    persistTasks(resetTasks());
+  }, [persistTasks]);
+
+  const addTask = useCallback((draft: TaskDraft): Task => {
+    const task: Task = {
+      id: uid(),
+      title: draft.title.trim(),
+      subject: draft.subject.trim(),
+      type: draft.type,
+      due: draft.due,
+      hours: parseFloat(draft.hours),
+      priority: draft.priority,
+      score: scoreForPriority(draft.priority),
+      completed: false,
+      createdAt: new Date().toISOString(),
+      ...(draft.notes?.trim() ? { notes: draft.notes.trim() } : {}),
+    };
+    persistTasks([...tasksRef.current, task]);
+    return task;
+  }, [persistTasks]);
+
+  const updateTask = useCallback((id: string, draft: TaskDraft) => {
+    persistTasks(tasksRef.current.map((t) => {
+      if (t.id !== id) return t;
+      const next: Task = {
+        ...t,
+        title: draft.title.trim(),
+        subject: draft.subject.trim(),
+        type: draft.type,
+        due: draft.due,
+        hours: parseFloat(draft.hours),
+        priority: draft.priority,
+        score: scoreForPriority(draft.priority),
+      };
+      if (draft.notes?.trim()) next.notes = draft.notes.trim();
+      else delete next.notes;
+      return next;
+    }));
+  }, [persistTasks]);
 
   const toggleComplete = useCallback((id: string) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? t.completed
-            ? { ...t, completed: false, completedAt: undefined }
-            : { ...t, completed: true, completedAt: todayISO() }
-          : t,
-      ),
-    );
-  }, []);
+    persistTasks(tasksRef.current.map((t) => {
+      if (t.id !== id) return t;
+      const completed = !t.completed;
+      const next: Task = { ...t, completed };
+      if (completed) next.completedAt = new Date().toISOString();
+      else delete next.completedAt;
+      return next;
+    }));
+  }, [persistTasks]);
 
-  // Reset demo restores ONLY tasks — the profile is untouched.
-  const resetDemo = useCallback(() => setTasks(buildDemoTasks(todayISO())), []);
+  const deleteTask = useCallback((id: string) => {
+    persistTasks(tasksRef.current.filter((t) => t.id !== id));
+  }, [persistTasks]);
 
-  const openNewTask = useCallback(() => setModal({ mode: 'new' }), []);
-  const openEditTask = useCallback((id: string) => setModal({ mode: 'edit', taskId: id }), []);
-  const closeModal = useCallback(() => setModal(null), []);
+  const openTask = useCallback((id: string) => setEditingId(id), []);
+  const closeTaskModal = useCallback(() => setEditingId(null), []);
+  const openNewTask = useCallback(() => setNewTaskOpen(true), []);
+  const closeNewTask = useCallback(() => setNewTaskOpen(false), []);
 
-  const value = useMemo<StoreValue>(
-    () => ({
-      today,
-      profile,
-      tasks,
-      signIn,
-      signOut,
-      addTask,
-      updateTask,
-      deleteTask,
-      toggleComplete,
-      resetDemo,
-      modal,
-      openNewTask,
-      openEditTask,
-      closeModal,
-    }),
-    [today, profile, tasks, signIn, signOut, addTask, updateTask, deleteTask, toggleComplete, resetDemo, modal, openNewTask, openEditTask, closeModal],
-  );
+  const value = useMemo<AppState>(() => ({
+    profile,
+    tasks,
+    hydrated,
+    today,
+    signIn,
+    signOut,
+    resetDemo,
+    addTask,
+    updateTask,
+    toggleComplete,
+    deleteTask,
+    editingId,
+    openTask,
+    closeTaskModal,
+    newTaskOpen,
+    openNewTask,
+    closeNewTask,
+  }), [profile, tasks, hydrated, today, signIn, signOut, resetDemo, addTask, updateTask, toggleComplete, deleteTask, editingId, openTask, closeTaskModal, newTaskOpen, openNewTask, closeNewTask]);
 
-  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
+  return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
 }
 
-export function useStore(): StoreValue {
-  const ctx = useContext(StoreContext);
-  if (!ctx) throw new Error('useStore must be used within StoreProvider');
+export function useApp(): AppState {
+  const ctx = useContext(AppCtx);
+  if (!ctx) throw new Error("useApp must be used inside AppProvider");
   return ctx;
 }
