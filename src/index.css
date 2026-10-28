@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-linen: #f6f1e7;
+  --color-cream: #fffdf7;
+  --color-navy: #16263f;
+  --color-navy-deep: #0f1c30;
+  --color-ink: #1d2e4b;
+  --color-mist: #5d7495;
+  --color-mist-soft: #8299b8;
+  --color-line: #dce4ee;
+  --color-gold: #d9a422;
+  --color-gold-deep: #b0821a;
+  --color-gold-soft: #f4e5bd;
+  --color-danger: #b3403a;
+  --color-danger-soft: #f7e4e2;
+  --font-display: "Fraunces", Georgia, 'Times New Roman', serif;
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+html {
+  background-color: var(--color-linen);
+}
+
+body {
+  background-color: var(--color-linen);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up {
+  animation: fadeUp 0.5s ease both;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.pop-in {
+  animation: popIn 0.18s ease both;
+}
+
+@keyframes flashRow {
+  0% { background-color: var(--color-gold-soft); }
+  100% { background-color: transparent; }
+}
+
+.flash-row {
+  animation: flashRow 1.6s ease both;
+}
+
+::selection {
+  background: var(--color-gold-soft);
+  color: var(--color-navy);
+}
