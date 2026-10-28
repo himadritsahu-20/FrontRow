@@ -1,73 +1,106 @@
-# React + TypeScript + Vite
+# FrontRow
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern event booking and seat discovery web application built with **React**, **TypeScript**, and **Vite**.
 
-Currently, two official plugins are available:
+🔗 **Live Demo:** [FrontRow on Vercel](https://d7hccu-euuxfei97-arcadawebapps5.vercel.app)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## 📌 Overview
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+**FrontRow** is designed to streamline event discovery and seat reservation. It delivers an interactive, responsive experience for exploring events, selecting preferred seats in real-time, and completing bookings seamlessly.
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## ✨ Features
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+* **Event Discovery:** Browse through upcoming concerts, shows, conferences, and sports events.
+* **Interactive Seat Selection:** Visual layout to preview, select, and reserve available seats.
+* **Fast & Responsive UI:** Optimized for performance across mobile, tablet, and desktop viewports using Vite and modern styling.
+* **Type-Safe Codebase:** Built entirely with TypeScript for maintainability and reliability.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🛠️ Tech Stack
+
+* **Framework:** React
+* **Language:** TypeScript
+* **Build Tool:** Vite
+* **Linting:** ESLint
+* **Hosting / Deployment:** Vercel
+
+---
+
+## 🚀 Getting Started
+
+Follow these instructions to set up the project locally.
+
+### Prerequisites
+
+Ensure you have the following installed:
+
+* [Node.js](https://nodejs.org/) (v18.0.0 or higher recommended)
+* `npm` or `yarn` / `pnpm`
+
+### Installation
+
+1. **Clone the repository:**
+```bash
+git clone https://github.com/himadritsahu-20/FrontRow.git
+cd FrontRow
+
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+2. **Install dependencies:**
+```bash
+npm install
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+
+
+3. **Run the development server:**
+```bash
+npm run dev
+
+```
+
+
+Open `http://localhost:5173` in your browser to view the application.
+
+---
+
+## 📦 Available Scripts
+
+In the project directory, you can run:
+
+* `npm run dev` – Starts the development server with Hot Module Replacement (HMR).
+* `npm run build` – Compiles TypeScript and creates an optimized production bundle in the `dist` folder.
+* `npm run preview` – Serves the production build locally for testing.
+* `npm run lint` – Runs ESLint across `.ts` and `.tsx` files to enforce code style and catch issues.
+
+---
+
+## 📂 Project Structure
+
+```text
+FrontRow/
+├── public/              # Static assets and icons
+├── src/                 # Application source code
+│   ├── components/      # UI components (seats, event cards, etc.)
+│   ├── types/           # TypeScript interfaces and definitions
+│   ├── App.tsx          # Main application component
+│   └── main.tsx         # Root entry point
+├── eslint.config.js     # ESLint configuration
+├── index.html           # HTML template
+├── package.json         # Dependencies and scripts
+├── tsconfig.json        # TypeScript configuration
+└── vite.config.ts       # Vite configuration
+
+```
+
+---
+
+## 📄 License
+
+This project is open-source and available under the MIT License.
