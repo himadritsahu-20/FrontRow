@@ -1,73 +1,67 @@
-# React + TypeScript + Vite
+# FrontRow 🎟️
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, responsive event booking and interactive ticket reservation platform built with React, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## ✨ Features
 
-## React Compiler
+- **Event Discovery:** Browse upcoming events, concerts, shows, and conferences.
+- **Seat Selection & Booking:** Real-time interactive seat picker with tier-based pricing.
+- **Responsive Design:** Optimized for mobile, tablet, and desktop screens.
+- **Fast Performance:** Built on Vite for near-instant hot module replacement (HMR) and optimized production bundles.
+- **Type Safety:** Strict end-to-end typing using TypeScript.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🛠️ Tech Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Framework:** [React 18 / 19](https://react.dev/)
+- **Language:** [TypeScript](https://www.typescriptlang.org/)
+- **Build Tool:** [Vite](https://vitejs.dev/)
+- **Styling:** CSS / Tailwind CSS
+- **Deployment:** Vercel
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 🚀 Getting Started
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Prerequisites
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Make sure you have Node.js (v18 or higher) installed on your machine.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Installation
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+1. **Clone the repository:**
+   ```bash
+   git clone [https://github.com/himadritsahu-20/FrontRow.git](https://github.com/himadritsahu-20/FrontRow.git)
+   cd FrontRow
+   ```
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+3. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
+4. Open your browser and navigate to
+   ```bash
+   http://localhost:5173
+   ```
+
+## 📁 Project Structure   
+FrontRow/
+├── public/              # Static assets
+├── src/                 # Application source code
+│   ├── assets/          # Images, icons, fonts
+│   ├── components/      # Reusable UI components
+│   ├── pages/           # Page views / routes
+│   ├── App.tsx          # Main root component
+│   └── main.tsx         # Entry point
+├── index.html           # HTML template
+├── vite.config.ts       # Vite configuration
+└── package.json         # Project metadata and dependencies
+
+## 📄 License
+This project is licensed under the MIT License.
